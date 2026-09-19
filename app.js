@@ -1,7 +1,7 @@
 /* InstagrameAMO: análisis local de una exportación coherente, sin datos al servidor. */
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],P=InstagrameParser;
 const state={followers:new Set(),following:new Set(),views:{},current:"notFollowingBack",page:0,pageSize:100};
-const labels={followers:["Seguidores","Presentes en el archivo de seguidores."],following:["Seguidos","Presentes en el archivo de seguidos."],mutual:["Coincidencias mutuas","Aparecen en ambos archivos."],notFollowingBack:["Sin coincidencia en seguidores","Los seguís, pero no aparecen en el archivo de seguidores. Podrían seguirte actualmente."],youDontFollow:["No los seguís (según archivo)","Aparecen en seguidores y no aparecen en seguidos."]};
+const labels={followers:["En el archivo de seguidores","Cuentas encontradas en followers; no necesariamente son todas las actuales."],following:["En el archivo de seguidos","Cuentas encontradas en following; no necesariamente son todas las actuales."],mutual:["En ambos archivos","Coincidencias registradas en ambas listas; no es un total actual verificado."],notFollowingBack:["Solo en seguidos del ZIP","Están en following, pero faltan en followers. Pueden seguirte actualmente."],youDontFollow:["Solo en seguidores del ZIP","Están en followers, pero faltan en following. No confirma a quién seguís ahora."]};
 function report(message){$("#status").textContent=message;}
 let processing=false;
 function updateLoading(label,done=null,total=null,detail=""){
@@ -93,11 +93,9 @@ async function processFiles(input){
     ?"El archivo de seguidores registra cuentas con fechas desde "+firstFollower+", pero el de seguidos incluye registros desde "+firstFollowing+". Se están comparando conjuntos con coberturas distintas: sus tamaños y diferencias NO equivalen a los del perfil actual."
     :"Los archivos incluyen un período solicitado acotado y no se ha podido confirmar que sus listas representen las relaciones actuales completas de la cuenta.";
    $("#limited-followers").textContent=String(found.followers.size);$("#limited-following").textContent=String(found.following.size);
-   report("Las listas exportadas no permiten concluir quién te sigue actualmente.");
-   updateLoading("Lectura completada",1,1,"Se detectaron datos cuya cobertura no permite comparaciones fiables.");
-   return;
+   report("Listas leídas. Podés explorar los registros, pero las diferencias no equivalen al estado actual de Instagram.");
   }
-  updateLoading("Calculando coincidencias…",null,null,"Ambas listas están completas. Preparando resultados.");
+  updateLoading("Calculando coincidencias entre los archivos…",null,null,"Preparando listas exploratorias.");
   await allowPaint();
   state.followers=found.followers;state.following=found.following;state.views=P.classify(found.followers,found.following);
   buildViews();$("#results").hidden=false;showAudit(parts);report("Archivos leídos. Resultado basado en la exportación, NO en el estado actual de Instagram.");selectView("notFollowingBack");
