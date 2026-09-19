@@ -6,6 +6,7 @@ function report(message){$("#status").textContent=message;}
 async function processFiles(input){
  const files=[...input],found={followers:new Set(),following:new Set()},parts={followers:[],following:[]};
  $("#results").hidden=true;$("#audit").hidden=true;report("Leyendo archivos de conexiones…");
+ if(typeof navigator!=="undefined")void checkConnection();
  try{
   if(!files.length)throw Error("Seleccioná el ZIP o los archivos de seguidores y seguidos.");
   if(files.some(f=>/\.zip$/i.test(f.name))&&files.length>1)throw Error("Elegí una sola exportación ZIP por vez. No mezcles archivos ni cuentas.");
@@ -65,3 +66,30 @@ $$("[data-view]").forEach(b=>b.onclick=()=>selectView(b.dataset.view));
 const drop=$("#drop");for(const ev of ["dragenter","dragover"])drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("drag");});
 for(const ev of ["dragleave","drop"])drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("drag");});
 drop.addEventListener("drop",e=>processFiles(e.dataTransfer.files));
+
+// Comprobación de conectividad independiente del análisis del ZIP: nunca contacta Instagram.
+let connectionCheckId=0;
+async function checkConnection(){
+ if(typeof navigator==="undefined"||typeof location==="undefined")return;
+ const stamp=++connectionCheckId, indicator=$("#connection-state");
+ const show=(message,status)=>{if(stamp===connectionCheckId){indicator.textContent=message;indicator.dataset.state=status;}};
+ if(!navigator.onLine){show("Sin conexión detectada · el análisis local funciona","offline");return;}
+ if(location.protocol==="file:"){show("Archivo local · conexión no verificada","unknown");return;}
+ if(!["http:","https:"].includes(location.protocol)){show("Conexión no verificable","unknown");return;}
+ show("Comprobando acceso al sitio…","unknown");
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),6000);
+ try{
+  const url=new URL("./parser.js",location.href);url.searchParams.set("conexion",String(Date.now()));
+  const response=await fetch(url,{method:"HEAD",cache:"no-store",signal:controller.signal});
+  show(response.ok?"Online · sitio accesible":"Sin acceso al sitio · podés analizar offline",response.ok?"online":"offline");
+ }catch{show("Sin acceso al sitio · podés analizar offline","offline");}
+ finally{clearTimeout(timer);}
+}
+if(typeof navigator!=="undefined"){
+ $("#check-connection").onclick=checkConnection;
+ if(typeof window.addEventListener==="function"){
+  window.addEventListener("online",checkConnection);
+  window.addEventListener("offline",checkConnection);
+ }
+ void checkConnection();
+}
