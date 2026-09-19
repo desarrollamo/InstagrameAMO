@@ -8,7 +8,16 @@ function kindFor(path){const name=String(path).split(/[\\/]/).pop().toLowerCase(
 function readRecord(item){if(!item||typeof item!=="object"||!Array.isArray(item.string_list_data))return"";for(const entry of item.string_list_data){const fromValue=normalize(entry?.value),fromLink=fromHref(entry?.href);if(fromValue)return fromValue;if(fromLink)return fromLink;}return"";}
 function jsonUsers(text,kind){const data=JSON.parse(text),rows=Array.isArray(data)?data:(kind==="following"?data.relationships_following:data.relationships_followers);if(!Array.isArray(rows))throw new Error("Estructura JSON no reconocida para "+kind);const out=new Set();for(const row of rows){const u=readRecord(row);if(u)out.add(u);}return out;}
 function htmlUsers(text){if(typeof DOMParser==="undefined")throw new Error("HTML requiere el navegador");const doc=new DOMParser().parseFromString(text,"text/html"),out=new Set();for(const a of doc.querySelectorAll("a[href]")){const u=fromHref(a.getAttribute("href"));if(u)out.add(u);}return out;}
-function parseEntry(path,text){const kind=kindFor(path);if(!kind)return null;return{kind,users:path.toLowerCase().endsWith(".json")?jsonUsers(text,kind):htmlUsers(text)};}
+function htmlExportPeriod(text){
+ const header=String(text).slice(0,32000);
+ if(!/Contiene los datos que has solicitado desde/i.test(header))return null;
+ const times=[...header.matchAll(/<time\b[^>]*\bdatetime=["']([^"']+)["'][^>]*>([^<]*)<\/time>/gi)];
+ const values=times.map(m=>Date.parse(m[1]));
+ if(values.length<3||!Number.isFinite(values[1])||!Number.isFinite(values[2])||values[2]<=values[1])return null;
+ const days=(values[2]-values[1])/86400000;
+ return{from:times[1][2].trim(),to:times[2][2].trim(),limited:days>0&&days<=400};
+}
+function parseEntry(path,text){const kind=kindFor(path);if(!kind)return null;const html=/\.html$/i.test(path);return{kind,users:html?htmlUsers(text):jsonUsers(text,kind),period:html?htmlExportPeriod(text):null};}
 function classify(followers,following){const mutual=[...followers].filter(u=>following.has(u)),notFollowingBack=[...following].filter(u=>!followers.has(u)),youDontFollow=[...followers].filter(u=>!following.has(u));return{followers:[...followers],following:[...following],mutual,notFollowingBack,youDontFollow};}
-const api={normalize,fromHref,kindFor,jsonUsers,htmlUsers,parseEntry,classify};root.InstagrameParser=api;if(typeof module!=="undefined"&&module.exports)module.exports=api;
+const api={normalize,fromHref,kindFor,jsonUsers,htmlUsers,htmlExportPeriod,parseEntry,classify};root.InstagrameParser=api;if(typeof module!=="undefined"&&module.exports)module.exports=api;
 })(typeof globalThis!=="undefined"?globalThis:this);

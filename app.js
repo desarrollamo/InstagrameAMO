@@ -28,8 +28,8 @@ async function allowPaint(){
 async function processFiles(input){
  if(processing){report("Ya hay una exportación en proceso. Esperá a que termine.");return;}
  processing=true;$("#pick").disabled=true;
- const files=[...input],found={followers:new Set(),following:new Set()},parts={followers:[],following:[]},openArchives=[];
- $("#results").hidden=true;$("#audit").hidden=true;$("#loading-preview").hidden=true;
+ const files=[...input],found={followers:new Set(),following:new Set()},parts={followers:[],following:[]},periods=[],openArchives=[];
+ $("#results").hidden=true;$("#audit").hidden=true;$("#limited-export").hidden=true;$("#loading-preview").hidden=true;
  report("Leyendo archivos de conexiones…");
  updateLoading("Preparando exportación…",null,null,"Identificando los archivos necesarios.");
  if(typeof navigator!=="undefined")void checkConnection();
@@ -77,11 +77,19 @@ async function processFiles(input){
      if(total>0)updateLoading(label,index+Math.min(1,loaded/total),entries.length,"Lectura del archivo actual; no se extraen fotos ni videos.");
     };
     const parsed=P.parseEntry(entry.path,await entry.read(onprogress));
-    if(parsed){parsed.users.forEach(u=>found[parsed.kind].add(u));parts[parsed.kind].push({name:entry.path.split(/[\\/]/).pop(),count:parsed.users.size});showPartial(found,parts);}
+    if(parsed){parsed.users.forEach(u=>found[parsed.kind].add(u));parts[parsed.kind].push({name:entry.path.split(/[\\/]/).pop(),count:parsed.users.size});if(parsed.period)periods.push(parsed.period);showPartial(found,parts);}
     updateLoading("Listas leídas: "+(index+1)+" de "+entries.length,index+1,entries.length,"Conteos provisionales hasta completar todas las listas.");
    }catch(err){throw Error("No se pudo leer un archivo de conexiones. "+err.message);}
   }
   if(!found.followers.size||!found.following.size)throw Error("Una lista quedó vacía; no se puede calcular quién no te sigue. Revisá el ZIP y el intervalo de exportación.");
+  const limited=periods.find(p=>p.limited);
+  if(limited){
+   $("#limited-export").hidden=false;$("#period-from").textContent=limited.from;$("#period-to").textContent=limited.to;
+   $("#limited-followers").textContent=String(found.followers.size);$("#limited-following").textContent=String(found.following.size);
+   report("Exportación con intervalo acotado: no se muestran comparaciones de seguimiento que podrían ser incorrectas.");
+   updateLoading("Lectura completada",1,1,"Se detectó un período limitado; solicitá una exportación «Desde siempre».");
+   return;
+  }
   updateLoading("Calculando coincidencias…",null,null,"Ambas listas están completas. Preparando resultados.");
   await allowPaint();
   state.followers=found.followers;state.following=found.following;state.views=P.classify(found.followers,found.following);
