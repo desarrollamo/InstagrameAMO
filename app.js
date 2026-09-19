@@ -3,10 +3,37 @@ const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],P=I
 const state={followers:new Set(),following:new Set(),views:{},current:"notFollowingBack",page:0,pageSize:100};
 const labels={followers:["Seguidores","Presentes en el archivo de seguidores."],following:["Seguidos","Presentes en el archivo de seguidos."],mutual:["Coincidencias mutuas","Aparecen en ambos archivos."],notFollowingBack:["Sin coincidencia en seguidores","Los seguís, pero no aparecen en el archivo de seguidores. Podrían seguirte actualmente."],youDontFollow:["No los seguís (según archivo)","Aparecen en seguidores y no aparecen en seguidos."]};
 function report(message){$("#status").textContent=message;}
+let processing=false;
+function updateLoading(label,done=null,total=null,detail=""){
+ const panel=$("#loading"),track=$("#loading-track"),bar=$("#loading-bar"),pct=$("#loading-percent");
+ panel.hidden=false;$("#loading-label").textContent=label;$("#loading-detail").textContent=detail||"Los archivos se analizan solamente en este navegador.";
+ const determinate=Number.isFinite(done)&&Number.isFinite(total)&&total>0;
+ track.classList.toggle("indeterminate",!determinate);
+ if(determinate){
+  const value=Math.max(0,Math.min(100,Math.round(done/total*100)));
+  bar.style.width=value+"%";pct.textContent=value+"%";track.setAttribute("aria-valuenow",String(value));
+ }else{
+  bar.style.width="";pct.textContent="";track.removeAttribute("aria-valuenow");
+ }
+}
+function showPartial(found,parts){
+ const preview=$("#loading-preview");preview.hidden=false;
+ const count=kind=>parts[kind].length?String(found[kind].size)+" (provisional)":"pendiente";
+ preview.textContent="Seguidores leídos: "+count("followers")+" · Seguidos leídos: "+count("following")+". Las comparaciones aparecen al finalizar ambas listas.";
+}
+async function allowPaint(){
+ if(typeof requestAnimationFrame==="function")await new Promise(resolve=>requestAnimationFrame(()=>resolve()));
+ else await new Promise(resolve=>setTimeout(resolve,0));
+}
 async function processFiles(input){
+ if(processing){report("Ya hay una exportación en proceso. Esperá a que termine.");return;}
+ processing=true;$("#pick").disabled=true;
  const files=[...input],found={followers:new Set(),following:new Set()},parts={followers:[],following:[]},openArchives=[];
- $("#results").hidden=true;$("#audit").hidden=true;report("Leyendo archivos de conexiones…");
+ $("#results").hidden=true;$("#audit").hidden=true;$("#loading-preview").hidden=true;
+ report("Leyendo archivos de conexiones…");
+ updateLoading("Preparando exportación…",null,null,"Identificando los archivos necesarios.");
  if(typeof navigator!=="undefined")void checkConnection();
+ await allowPaint();
  try{
   if(!files.length)throw Error("Seleccioná el ZIP o los archivos de seguidores y seguidos.");
   if(files.some(f=>/\.zip$/i.test(f.name))&&files.length>1)throw Error("Elegí una sola exportación ZIP por vez. No mezcles archivos ni cuentas.");
@@ -15,11 +42,15 @@ async function processFiles(input){
    if(/\.zip$/i.test(file.name)){
     if(!window.zip?.ZipReader)throw Error("No se cargó el lector ZIP.");
     report("Leyendo índice ZIP sin cargar fotos ni videos…");
+    updateLoading("Revisando índice del ZIP…",null,null,"El tamaño del ZIP no indica cuánto falta: primero se localizan las listas de conexiones.");
+    await allowPaint();
     const reader=new zip.ZipReader(new zip.BlobReader(file),{useWebWorkers:false});
     openArchives.push(reader);
     const archiveEntries=await reader.getEntries();
-    for(const entry of archiveEntries)if(!entry.directory&&P.kindFor(entry.filename))entries.push({path:entry.filename,read:()=>entry.getData(new zip.TextWriter(),{useWebWorkers:false})});
+    for(const entry of archiveEntries)if(!entry.directory&&P.kindFor(entry.filename))entries.push({path:entry.filename,read:onprogress=>entry.getData(new zip.TextWriter(),{useWebWorkers:false,onprogress})});
     report("Índice listo: "+archiveEntries.length+" entradas; solo "+entries.length+" archivos de conexiones se descomprimirán.");
+    updateLoading("Encontradas "+entries.length+" listas de conexiones",0,entries.length,"No se descomprimen fotografías ni videos.");
+    await allowPaint();
    }else if(P.kindFor(file.name))entries.push({path:file.name,read:()=>file.text()});
   }
   const followingFiles=entries.filter(e=>P.kindFor(e.path)==="following");
@@ -34,12 +65,30 @@ async function processFiles(input){
    const group=path=>path.replace(/\\/g,"/").replace(/\/[^/]+$/,"");
    if(followerFiles.some(e=>group(e.path)!==group(followingFiles[0].path)))throw Error("Seguidores y seguidos provienen de carpetas distintas. Importá una sola exportación de una cuenta.");
   }
-  for(const [index,entry] of entries.entries()){report("Procesando archivo de conexiones "+(index+1)+"/"+entries.length+"…");try{const parsed=P.parseEntry(entry.path,await entry.read());if(parsed){parsed.users.forEach(u=>found[parsed.kind].add(u));parts[parsed.kind].push({name:entry.path.split(/[\\/]/).pop(),count:parsed.users.size});}}catch(err){throw Error("No se pudo leer un archivo de conexiones. "+err.message);}}
+  let lastProgressAt=0;
+  for(const [index,entry] of entries.entries()){
+   const label="Leyendo lista "+(index+1)+" de "+entries.length;
+   report("Procesando archivo de conexiones "+(index+1)+"/"+entries.length+"…");
+   updateLoading(label,index,entries.length,"Se descomprimen únicamente las listas de seguidores y seguidos.");
+   await allowPaint();
+   try{
+    const onprogress=(loaded,total)=>{
+     const now=Date.now();if(now-lastProgressAt<90&&loaded<total)return;lastProgressAt=now;
+     if(total>0)updateLoading(label,index+Math.min(1,loaded/total),entries.length,"Lectura del archivo actual; no se extraen fotos ni videos.");
+    };
+    const parsed=P.parseEntry(entry.path,await entry.read(onprogress));
+    if(parsed){parsed.users.forEach(u=>found[parsed.kind].add(u));parts[parsed.kind].push({name:entry.path.split(/[\\/]/).pop(),count:parsed.users.size});showPartial(found,parts);}
+    updateLoading("Listas leídas: "+(index+1)+" de "+entries.length,index+1,entries.length,"Conteos provisionales hasta completar todas las listas.");
+   }catch(err){throw Error("No se pudo leer un archivo de conexiones. "+err.message);}
+  }
   if(!found.followers.size||!found.following.size)throw Error("Una lista quedó vacía; no se puede calcular quién no te sigue. Revisá el ZIP y el intervalo de exportación.");
+  updateLoading("Calculando coincidencias…",null,null,"Ambas listas están completas. Preparando resultados.");
+  await allowPaint();
   state.followers=found.followers;state.following=found.following;state.views=P.classify(found.followers,found.following);
   buildViews();$("#results").hidden=false;showAudit(parts);report("Archivos leídos. Resultado basado en la exportación, NO en el estado actual de Instagram.");selectView("notFollowingBack");
+  updateLoading("Análisis finalizado",1,1,"Las cinco métricas están calculadas.");
  }catch(err){report("No se muestran resultados: "+err.message);}
- finally{await Promise.allSettled(openArchives.map(reader=>reader.close()));}
+ finally{await Promise.allSettled(openArchives.map(reader=>reader.close()));$("#loading").hidden=true;$("#pick").disabled=false;processing=false;}
 }
 function buildViews(){const v=state.views;$("#nFollowers").textContent=v.followers.length;$("#nFollowing").textContent=v.following.length;$("#nMutual").textContent=v.mutual.length;$("#nNotBack").textContent=v.notFollowingBack.length;$("#nYouDont").textContent=v.youDontFollow.length;}
 function showAudit(parts){
