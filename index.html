@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="InstagrameAMO compara seguidores y seguidos de una exportación de Instagram, sin pedir contraseña.">
+<title>InstagrameAMO · DesarrollAMO</title>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<main class="shell">
+<header><a class="brand" href="https://desarrollamo.com.ar/">DesarrollAMO</a><span class="tag">PLUGGIN · LOCAL</span></header>
+<section class="hero"><p class="eyebrow">INSTAGRAMEAMO</p><h1>¿Quién te sigue y quién no?</h1><p>Analizá tu exportación de Instagram sin ingresar usuario ni contraseña. Los archivos se procesan en este dispositivo.</p></section>
+<section class="drop" id="drop"><input id="files" type="file" accept=".zip,.json,.html" multiple hidden><button id="pick">Elegir exportación</button><strong>o arrastrá acá el ZIP / JSON / HTML</strong><small>Compatible con seguidores y seguidos exportados desde Instagram.</small></section>
+<section id="status" class="status">Esperando archivos.</section>
+<section id="results" class="results" hidden>
+<div class="stats"><button data-view="followers"><b id="nFollowers">0</b><span>Seguidores</span></button><button data-view="following"><b id="nFollowing">0</b><span>Seguidos</span></button><button data-view="mutual"><b id="nMutual">0</b><span>Mutuos</span></button><button data-view="notFollowingBack"><b id="nNotBack">0</b><span>No te siguen</span></button><button data-view="youDontFollow"><b id="nYouDont">0</b><span>No los seguís</span></button></div>
+<div class="toolbar"><div><h2 id="viewTitle">Resultados</h2><p id="viewNote"></p></div><input id="search" type="search" placeholder="Buscar @usuario"><button id="csv">Exportar CSV</button></div>
+<div id="list" class="list"></div>
+</section>
+<section class="privacy"><b>Privacidad:</b> no usamos la API de Instagram, no pedimos credenciales y no enviamos tu lista a un servidor.</section>
+<footer>InstagrameAMO · una herramienta de DesarrollAMO</footer>
+</main>
+<script src="./vendor/jszip.min.js"></script><script src="./app.js"></script>
+</body></html>
