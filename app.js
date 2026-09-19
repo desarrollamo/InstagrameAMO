@@ -77,17 +77,24 @@ async function processFiles(input){
      if(total>0)updateLoading(label,index+Math.min(1,loaded/total),entries.length,"Lectura del archivo actual; no se extraen fotos ni videos.");
     };
     const parsed=P.parseEntry(entry.path,await entry.read(onprogress));
-    if(parsed){parsed.users.forEach(u=>found[parsed.kind].add(u));parts[parsed.kind].push({name:entry.path.split(/[\\/]/).pop(),count:parsed.users.size});if(parsed.period)periods.push(parsed.period);showPartial(found,parts);}
+    if(parsed){parsed.users.forEach(u=>found[parsed.kind].add(u));parts[parsed.kind].push({name:entry.path.split(/[\\/]/).pop(),count:parsed.users.size,years:parsed.years});if(parsed.period)periods.push(parsed.period);showPartial(found,parts);}
     updateLoading("Listas leídas: "+(index+1)+" de "+entries.length,index+1,entries.length,"Conteos provisionales hasta completar todas las listas.");
    }catch(err){throw Error("No se pudo leer un archivo de conexiones. "+err.message);}
   }
   if(!found.followers.size||!found.following.size)throw Error("Una lista quedó vacía; no se puede calcular quién no te sigue. Revisá el ZIP y el intervalo de exportación.");
   const limited=periods.find(p=>p.limited);
-  if(limited){
-   $("#limited-export").hidden=false;$("#period-from").textContent=limited.from;$("#period-to").textContent=limited.to;
+  const earliest=kind=>{const years=parts[kind].map(x=>x.years?.earliest).filter(Number.isFinite);return years.length?Math.min(...years):null;};
+  const firstFollower=earliest("followers"),firstFollowing=earliest("following");
+  const differentCoverage=firstFollower!==null&&firstFollowing!==null&&firstFollowing<firstFollower;
+  if(limited||differentCoverage){
+   $("#limited-export").hidden=false;
+   $("#period-from").textContent=limited?.from||"no identificado";$("#period-to").textContent=limited?.to||"no identificado";
+   $("#coverage-detail").textContent=differentCoverage
+    ?"El archivo de seguidores registra cuentas con fechas desde "+firstFollower+", pero el de seguidos incluye registros desde "+firstFollowing+". Se están comparando conjuntos con coberturas distintas: sus tamaños y diferencias NO equivalen a los del perfil actual."
+    :"Los archivos incluyen un período solicitado acotado y no se ha podido confirmar que sus listas representen las relaciones actuales completas de la cuenta.";
    $("#limited-followers").textContent=String(found.followers.size);$("#limited-following").textContent=String(found.following.size);
-   report("Exportación con intervalo acotado: no se muestran comparaciones de seguimiento que podrían ser incorrectas.");
-   updateLoading("Lectura completada",1,1,"Se detectó un período limitado; solicitá una exportación «Desde siempre».");
+   report("Las listas exportadas no permiten concluir quién te sigue actualmente.");
+   updateLoading("Lectura completada",1,1,"Se detectaron datos cuya cobertura no permite comparaciones fiables.");
    return;
   }
   updateLoading("Calculando coincidencias…",null,null,"Ambas listas están completas. Preparando resultados.");

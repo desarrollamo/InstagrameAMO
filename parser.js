@@ -17,7 +17,11 @@ function htmlExportPeriod(text){
  const days=(values[2]-values[1])/86400000;
  return{from:times[1][2].trim(),to:times[2][2].trim(),limited:days>0&&days<=400};
 }
-function parseEntry(path,text){const kind=kindFor(path);if(!kind)return null;const html=/\.html$/i.test(path);return{kind,users:html?htmlUsers(text):jsonUsers(text,kind),period:html?htmlExportPeriod(text):null};}
+function htmlRecordYears(text){
+ const years=[...String(text).matchAll(/(?:ene|feb|mar|abr|may|jun|jul|ago|sep|sept|oct|nov|dic|jan|apr|aug|dec)[a-z]*\.?\s+\d{1,2},?\s+(20\d{2})/gi)].map(m=>Number(m[1])).filter(y=>y>=2010&&y<=new Date().getFullYear()+1);
+ return years.length?{earliest:Math.min(...years),latest:Math.max(...years),records:years.length}:null;
+}
+function parseEntry(path,text){const kind=kindFor(path);if(!kind)return null;const html=/\.html$/i.test(path);return{kind,users:html?htmlUsers(text):jsonUsers(text,kind),period:html?htmlExportPeriod(text):null,years:html?htmlRecordYears(text):null};}
 function classify(followers,following){const mutual=[...followers].filter(u=>following.has(u)),notFollowingBack=[...following].filter(u=>!followers.has(u)),youDontFollow=[...followers].filter(u=>!following.has(u));return{followers:[...followers],following:[...following],mutual,notFollowingBack,youDontFollow};}
-const api={normalize,fromHref,kindFor,jsonUsers,htmlUsers,htmlExportPeriod,parseEntry,classify};root.InstagrameParser=api;if(typeof module!=="undefined"&&module.exports)module.exports=api;
+const api={normalize,fromHref,kindFor,jsonUsers,htmlUsers,htmlExportPeriod,htmlRecordYears,parseEntry,classify};root.InstagrameParser=api;if(typeof module!=="undefined"&&module.exports)module.exports=api;
 })(typeof globalThis!=="undefined"?globalThis:this);

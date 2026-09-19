@@ -20,4 +20,6 @@ assert.equal(period.limited,true);
 assert.equal(period.from,"18 de septiembre de 2025");
 assert.equal(period.to,"18 de septiembre de 2026");
 assert.equal(p.htmlExportPeriod("<p>sin fechas</p>"),null);
+assert.deepEqual(p.htmlRecordYears("<div>sept. 18, 2026</div><div>jul. 13, 2015</div>"),{earliest:2015,latest:2026,records:2});
+assert.equal(p.htmlRecordYears("<p>sin registros</p>"),null);
 console.log("PASS: parser, múltiples partes, clasificación, rutas, intervalo acotado y JSON inválido");
