@@ -1,0 +1,17 @@
+const assert=require("node:assert/strict"),p=require("../parser.js");
+const entry=(u)=>({string_list_data:[{href:"https://www.instagram.com/"+u+"/",value:u}]});
+const followers=JSON.stringify([entry("ana"),entry("Beto"),entry("carla")]);
+const following=JSON.stringify({relationships_following:[entry("beto"),entry("carla"),entry("diego")]});
+assert.deepEqual([...p.jsonUsers(followers,"followers")].sort(),["ana","beto","carla"]);
+assert.deepEqual([...p.jsonUsers(following,"following")].sort(),["beto","carla","diego"]);
+const v=p.classify(p.jsonUsers(followers,"followers"),p.jsonUsers(following,"following"));
+assert.deepEqual(v.mutual.sort(),["beto","carla"]);
+assert.deepEqual(v.notFollowingBack,["diego"]);
+assert.deepEqual(v.youDontFollow,["ana"]);
+assert.equal(p.kindFor("instagram-user/connections/followers_and_following/followers_2.json"),"followers");
+assert.equal(p.kindFor("instagram-user/connections/followers_and_following/following.json"),"following");
+assert.equal(p.kindFor("close_friends.json"),"");
+assert.equal(p.fromHref("https://phishing.example/ana"),"");
+assert.equal(p.normalize("Beto"),"beto");
+assert.throws(()=>p.jsonUsers('{"relationships_following":[]}',"followers"),/no reconocida/);
+console.log("PASS: parser, múltiples partes, clasificación, rutas y JSON inválido");
